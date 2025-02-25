@@ -85,11 +85,12 @@ class MLPClassifier(nn.Module):
 
         # Calculate input dimensions (flattened image)
         input_dim = 3 * h * w  # 3 channels * height * width
-        hidden_dim = 64  # Size of the hidden layer
+        hidden_dim = 16  # tendency to over-fit if high value within the hidden_dim.
 
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.relu = nn.ReLU()
+        self.ln = nn.LayerNorm(hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -103,8 +104,10 @@ class MLPClassifier(nn.Module):
         x = self.flatten(x)
         x = self.fc1(x)
         x = self.relu(x) # activation function
+        x = self.ln(x)
 
         return self.fc2(x)
+
 
 class MLPClassifierDeep(nn.Module):
     def __init__(
@@ -112,8 +115,8 @@ class MLPClassifierDeep(nn.Module):
             h: int = 64,
             w: int = 64,
             num_classes: int = 6,
-            num_layers: int = 6,
-            hidden_dim: int = 64
+            num_layers: int = 7,
+            hidden_dim: int = 16
     ):
         """
         An MLP with multiple hidden layers using ModuleList for better layer management.
@@ -139,6 +142,7 @@ class MLPClassifierDeep(nn.Module):
         self.output_layer = nn.Linear(hidden_dim, num_classes)
 
         self.activation = nn.ReLU()
+        self.ln = nn.LayerNorm(hidden_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -152,7 +156,9 @@ class MLPClassifierDeep(nn.Module):
 
         for i, layer in enumerate(self.layers):
             x = layer(x)
+            x = self.ln(x)
             x = self.activation(x)
+
 
         x = self.output_layer(x)
 
@@ -184,7 +190,7 @@ class MLPClassifierDeepResidual(nn.Module):
 
         self.flatten = nn.Flatten()
         self.input_layer = nn.Linear(input_dim, hidden_dim)
-        self.input_bn = nn.BatchNorm1d(hidden_dim)
+        self.input_ln = nn.LayerNorm(hidden_dim)
         self.input_relu = nn.ReLU()
 
         self.residual_blocks = nn.ModuleList([
@@ -203,17 +209,19 @@ class MLPClassifierDeepResidual(nn.Module):
         """
         x = self.flatten(x)
         x = self.input_layer(x)
-        x = self.input_bn(x)
+        x = self.input_ln(x)
         x = self.input_relu(x)
 
         for block in self.residual_blocks:
             x = block(x)
 
-        return self.output_layer(x)
+        out = self.output_layer(x)
+
+        return out
 
 
 class ResidualBlock(nn.Module):
-    def __init__(self, hidden_dim: int, dropout_rate: float = 0.1):
+    def __init__(self, hidden_dim: int):
         """
         A residual block for MLPs
 
@@ -226,12 +234,11 @@ class ResidualBlock(nn.Module):
 
         # Main branch modules
         self.linear1 = nn.Linear(hidden_dim, hidden_dim)
-        self.bn1 = nn.BatchNorm1d(hidden_dim)
+        self.ln1 = nn.LayerNorm(hidden_dim)
         # Batch normalization normalizes the output of the previous layer to reduce noise
         self.relu1 = nn.ReLU()
-        self.dropout = nn.Dropout(dropout_rate)
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.bn2 = nn.BatchNorm1d(hidden_dim)
+        self.ln2 = nn.LayerNorm(hidden_dim)
 
         # Final activation after addition
         self.relu_out = nn.ReLU()
@@ -250,16 +257,16 @@ class ResidualBlock(nn.Module):
         identity = x
 
         out = self.linear1(x)
-        out = self.bn1(out)
+        out = self.ln1(out)
         out = self.relu1(out)
-        out = self.dropout(out)
 
         out = self.linear2(out)
-        out = self.bn2(out)
+        out = self.ln2(out)
         out += identity
 
         out = self.relu_out(out)
-        return self.dropout_out(out)
+        out = self.dropout_out(out)
+        return out
 
 
 model_factory = {
