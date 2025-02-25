@@ -112,7 +112,7 @@ class MLPClassifierDeep(nn.Module):
             h: int = 64,
             w: int = 64,
             num_classes: int = 6,
-            num_layers: int = 4,
+            num_layers: int = 6,
             hidden_dim: int = 64
     ):
         """
@@ -158,14 +158,15 @@ class MLPClassifierDeep(nn.Module):
 
         return x
 
+
 class MLPClassifierDeepResidual(nn.Module):
     def __init__(
             self,
             h: int = 64,
             w: int = 64,
             num_classes: int = 6,
-            hidden_dim: int = 64,
-            num_blocks: int = 5 # note that these are 2x a single hidden layer essentially
+            hidden_dim: int = 32,
+            num_blocks: int = 5  # note that these are 2x a single hidden layer essentially
     ):
         """
         An MLP with residual connections between blocks using ModuleList
